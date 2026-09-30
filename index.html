@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Cámara GPS</title>
+<style>
+:root{--red:#E1001A;--red2:#c00018;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--glass:rgba(14,14,16,.66);--line:rgba(255,255,255,.14)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;color:#fff;font-family:Roboto,"Segoe UI",Arial,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.app{position:fixed;inset:0;display:flex;flex-direction:column}
+/* Top bar */
+.top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;background:linear-gradient(#000,rgba(0,0,0,.85));z-index:5}
+.brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--red);display:grid;place-items:center;box-shadow:0 4px 14px rgba(225,0,26,.45)}
+.logo svg{width:20px;height:20px}
+.bt{line-height:1.1;min-width:0}
+.bt b{display:block;font-size:15px;font-weight:700;letter-spacing:.2px}
+.bt span{font-size:11px;color:#a1a1aa;letter-spacing:.6px;text-transform:uppercase}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#18181b;border:1px solid var(--line);font-size:12px;font-weight:600;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:#71717a}
+.chip.ok i{background:var(--ok);box-shadow:0 0 0 3px rgba(34,197,94,.2)}
+.chip.warn i{background:var(--warn);box-shadow:0 0 0 3px rgba(245,158,11,.2)}
+.chip.bad i{background:var(--bad);box-shadow:0 0 0 3px rgba(239,68,68,.2)}
+.chip.wait i{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.ibtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#18181b;border:1px solid var(--line)}
+.ibtn svg{width:19px;height:19px}
+/* Stage */
+.stage{position:relative;flex:1;overflow:hidden;background:#000}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+video.mirror{transform:scaleX(-1)}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.flash.on{opacity:.85;transition:none}
+.notice{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:28px}
+.notice.on{display:flex}
+.notice h3{font-size:17px}
+.notice p{font-size:13.5px;color:#a1a1aa;line-height:1.5;max-width:320px}
+.pbtn{background:var(--red);color:#fff;font-weight:700;font-size:14px;padding:12px 20px;border-radius:12px;box-shadow:0 6px 18px rgba(225,0,26,.35)}
+.pbtn:active{background:var(--red2)}
+/* Live stamp */
+.stamp{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;align-items:stretch;pointer-events:none}
+.mini{width:92px;flex:none;border-radius:8px;overflow:hidden;background:#2a2e33;border:1px solid rgba(255,255,255,.2)}
+.mini canvas{width:100%;height:100%;display:block}
+.info{flex:1;min-width:0;background:var(--glass);border-radius:8px;padding:9px 11px;font-size:11.5px;line-height:1.35;backdrop-filter:blur(2px)}
+.info .t{font-size:14.5px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.info .t .flag{display:inline-block;width:18px;height:12px;flex:none;background:linear-gradient(90deg,#D91023 33.3%,#fff 33.3% 66.6%,#D91023 66.6%);border-radius:1px}
+.info div{overflow-wrap:anywhere}
+.info .x{color:#fca5a5}
+/* Bottom controls */
+.bar{display:flex;align-items:center;justify-content:space-around;padding:16px 20px calc(env(safe-area-inset-bottom) + 18px);background:#000;z-index:5}
+.side{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:#d4d4d8;width:72px}
+.side .ibtn{width:48px;height:48px}
+.side .ibtn svg{width:22px;height:22px}
+.shutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center;transition:transform .1s}
+.shutter span{width:62px;height:62px;border-radius:50%;background:var(--red);box-shadow:inset 0 -4px 0 var(--red2)}
+.shutter:active{transform:scale(.92)}
+.shutter:disabled{opacity:.4}
+/* Sheets */
+.sheet{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,.6)}
+.sheet.on{display:flex}
+.panel{background:#111113;border-top:3px solid var(--red);border-radius:18px 18px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 18px);max-height:88%;overflow:auto}
+.panel h2{font-size:17px;margin-bottom:4px}
+.panel .sub{font-size:12.5px;color:#a1a1aa;margin-bottom:16px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-size:11.5px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.fld input[type=text]{width:100%;background:#1c1c1f;border:1px solid #2e2e33;border-radius:10px;padding:12px;color:#fff;font-size:15px;outline:none}
+.fld input[type=text]:focus{border-color:var(--red)}
+.tog{display:flex;align-items:center;justify-content:space-between;background:#1c1c1f;border:1px solid #2e2e33;border-radius:10px;padding:12px;margin-bottom:10px;font-size:14px}
+.tog small{display:block;color:#a1a1aa;font-size:11.5px;margin-top:2px}
+.sw{position:relative;width:44px;height:26px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:#3f3f46;border-radius:999px;transition:.2s}
+.sw span:after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.sw input:checked+span{background:var(--red)}
+.sw input:checked+span:after{transform:translateX(18px)}
+.row{display:flex;gap:10px;margin-top:6px}
+.row button{flex:1;padding:13px;border-radius:12px;font-weight:700;font-size:14px}
+.ghost{background:#1c1c1f;border:1px solid #2e2e33}
+/* Result */
+.result{position:fixed;inset:0;z-index:15;background:#000;display:none;flex-direction:column}
+.result.on{display:flex}
+.result .img{flex:1;display:grid;place-items:center;overflow:hidden;padding:10px}
+.result img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:12px 14px calc(env(safe-area-inset-bottom) + 16px)}
+.acts button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:14px;font-size:12.5px;font-weight:600;background:#18181b;border:1px solid var(--line)}
+.acts button svg{width:22px;height:22px}
+.acts .main{background:var(--red);border-color:var(--red)}
+.meta{padding:0 16px;font-size:11.5px;color:#a1a1aa;text-align:center}
+.toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%) translateY(20px);background:#fff;color:#111;font-size:13px;font-weight:600;padding:10px 16px;border-radius:999px;opacity:0;transition:.25s;z-index:30;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+.toast.on{opacity:1;transform:translateX(-50%)}
+#fileIn{display:none}
+.chip{cursor:pointer}
+.steps{margin:0 0 14px 18px;font-size:13.5px;line-height:1.5;color:#e4e4e7}
+.steps li{margin-bottom:10px;padding-left:4px}
+.steps li::marker{color:var(--red);font-weight:700}
+.steps .k{background:#27272a;border-radius:6px;padding:1px 6px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/></svg></div>
+      <div class="bt"><b>Cámara GPS</b><span>Provefabrica</span></div>
+    </div>
+    <div class="chip wait" id="gpsChip"><i></i><span id="gpsTxt">Buscando GPS…</span></div>
+    <button class="ibtn" id="btnCfg" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+  </header>
+
+  <main class="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="flash" id="flash"></div>
+    <div class="notice" id="notice">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#E1001A" stroke-width="1.8" stroke-linecap="round"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <h3 id="nTitle">Iniciando cámara…</h3>
+      <p id="nText">Permite el acceso a la cámara y a la ubicación cuando el navegador lo pida.</p>
+      <button class="pbtn" id="nRetry" style="display:none">Reintentar</button>
+    </div>
+    <div class="stamp" id="stamp">
+      <div class="mini"><canvas id="miniMap" width="184" height="184"></canvas></div>
+      <div class="info">
+        <div class="t"><span id="lTitle">Buscando ubicación…</span><i class="flag" id="lFlag" style="display:none"></i></div>
+        <div id="lAddr"></div>
+        <div id="lCoord"></div>
+        <div id="lDate"></div>
+        <div id="lExtra" class="x"></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bar">
+    <div class="side">
+      <button class="ibtn" id="btnSys" aria-label="Cámara del sistema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></button>
+      Cámara nativa
+    </div>
+    <button class="shutter" id="btnShot" aria-label="Tomar foto"><span></span></button>
+    <div class="side">
+      <button class="ibtn" id="btnFlip" aria-label="Cambiar cámara"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg></button>
+      Girar
+    </div>
+  </nav>
+</div>
+
+<input type="file" id="fileIn" accept="image/*" capture="environment">
+
+<!-- Resultado -->
+<section class="result" id="result">
+  <div class="img"><img id="resImg" alt="Foto con sello GPS"></div>
+  <p class="meta" id="resMeta"></p>
+  <div class="acts">
+    <button id="btnAgain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Otra foto</button>
+    <button id="btnSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Guardar</button>
+    <button id="btnShare" class="main"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Compartir</button>
+  </div>
+</section>
+
+<!-- Ajustes -->
+<section class="sheet" id="cfg">
+  <div class="panel">
+    <h2>Ajustes del sello</h2>
+    <p class="sub">Estos datos se imprimen en cada foto y quedan guardados en este teléfono.</p>
+    <div class="fld"><label>Colaborador</label><input type="text" id="cName" placeholder="Ej.: Juan Pérez" maxlength="40"></div>
+    <div class="fld"><label>Nota (placa, cliente, guía)</label><input type="text" id="cNote" placeholder="Ej.: Placa ABC-123 · Cliente" maxlength="60"></div>
+    <div class="tog"><div>Incluir mapa satelital<small>Requiere internet al tomar la foto</small></div><label class="sw"><input type="checkbox" id="cMap"><span></span></label></div>
+    <div class="tog"><div>Mostrar precisión GPS<small>Agrega “±m” junto a las coordenadas</small></div><label class="sw"><input type="checkbox" id="cAcc"><span></span></label></div>
+    <div class="row"><button class="ghost" id="cCancel">Cancelar</button><button class="pbtn" id="cSave">Guardar</button></div>
+  </div>
+</section>
+
+<!-- Ayuda de ubicación -->
+<section class="sheet" id="geoHelp">
+  <div class="panel">
+    <h2 id="ghTitle">Ubicación bloqueada</h2>
+    <p class="sub" id="ghSub"></p>
+    <ol class="steps">
+      <li><b>En la página:</b> toca el ícono <span class="k">⚙︎ / 🔒</span> a la izquierda de la dirección web → <b>Permisos</b> → <b>Ubicación</b> → <b>Permitir</b>.</li>
+      <li><b>En el teléfono:</b> Ajustes → Aplicaciones → <b>Chrome</b> (o Navegador Huawei) → Permisos → <b>Ubicación</b> → <b>Permitir mientras se usa</b>, con “Usar ubicación precisa” activado.</li>
+      <li><b>GPS encendido:</b> baja la barra de notificaciones y activa <b>Ubicación</b>.</li>
+      <li>Vuelve aquí y toca <b>Reintentar</b>.</li>
+    </ol>
+    <div class="row"><button class="ghost" id="ghClose">Cerrar</button><button class="pbtn" id="ghRetry">Reintentar</button></div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const S={facing:'environment',stream:null,pos:null,geo:null,lastGeoPos:null,lastGeoAt:0,geoBusy:false,
+  mapPos:null,mapCanvas:null,mapBusy:false,blob:null,url:null,fname:'',
+  cfg:{name:'',note:'',map:true,acc:false}};
+try{Object.assign(S.cfg,JSON.parse(localStorage.getItem('gpscam_cfg')||'{}'))}catch(e){}
+function saveCfg(){try{localStorage.setItem('gpscam_cfg',JSON.stringify(S.cfg))}catch(e){}}
+
+/* ---------- utilidades ---------- */
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const p2=n=>String(n).padStart(2,'0');
+function fmtDate(d){
+  let h=d.getHours();const ap=h<12?'a. m.':'p. m.';h=h%12||12;
+  const off=-d.getTimezoneOffset(),sg=off>=0?'+':'-',a=Math.abs(off);
+  return `${DIAS[d.getDay()]}, ${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()} ${p2(h)}:${p2(d.getMinutes())} ${ap} GMT ${sg}${p2(Math.floor(a/60))}:${p2(a%60)}`;
+}
+function stampName(d){return `GPS_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`}
+function dist(a,b){const R=6371e3,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lng-a.lng)*r;
+  const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+let tt;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* Plus Code (Open Location Code) de 11 dígitos */
+const OA='23456789CFGHJMPQRVWX';
+function plusCode(lat,lng){
+  lat=Math.max(-90,Math.min(90,lat));lng=((lng+180)%360+360)%360-180;
+  let la=Math.floor((lat+90)*40000),lo=Math.floor((lng+180)*32000);
+  if(la>=7200000)la=7199999;
+  const g=OA[(la%5)*4+(lo%4)];la=Math.floor(la/5);lo=Math.floor(lo/4);
+  let c='';for(let i=0;i<5;i++){c=OA[la%20]+OA[lo%20]+c;la=Math.floor(la/20);lo=Math.floor(lo/20)}
+  return c.slice(0,8)+'+'+c.slice(8)+g;
+}
+
+/* ---------- GPS ---------- */
+function setChip(cls,txt){const c=$('gpsChip');c.className='chip '+cls;$('gpsTxt').textContent=txt}
+/* Pide la ubicación ANTES que la cámara: si ambos permisos se piden a la vez,
+   el navegador puede descartar el de ubicación y dejarlo bloqueado. */
+function askGeoOnce(ms){
+  return new Promise(res=>{
+    if(!navigator.geolocation){res(false);return}
+    let done=false;const fin=v=>{if(!done){done=true;res(v)}};
+    navigator.geolocation.getCurrentPosition(p=>{onPos(p);fin(true)},e=>{onPosErr(e);fin(false)},
+      {enableHighAccuracy:false,maximumAge:60000,timeout:15000});
+    setTimeout(()=>fin(false),ms);
+  });
+}
+function startGeo(){
+  if(!navigator.geolocation){setChip('bad','Sin GPS');return}
+  if(S.watchId!=null){try{navigator.geolocation.clearWatch(S.watchId)}catch(e){}}
+  S.watchId=navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+}
+function onPos(p){
+  S.geoErr=0;
+  S.pos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy||0,t:Date.now()};
+  const a=Math.round(S.pos.acc);
+  setChip(a<=20?'ok':a<=60?'warn':'bad',`GPS ±${a} m`);
+  if($('geoHelp').classList.contains('on'))$('geoHelp').classList.remove('on');
+  maybeGeocode();maybeMap();renderLive();
+}
+function onPosErr(e){
+  S.geoErr=e.code;
+  if(S.pos&&e.code===3)return; // timeout puntual con posición previa: se ignora
+  if(e.code===1){setChip('bad','Sin permiso · tocar');if(!S.helpShown){S.helpShown=true;openGeoHelp()}}
+  else if(e.code===2){setChip('bad','GPS apagado · tocar')}
+  else if(!S.pos)setChip('wait bad','Sin señal GPS');
+}
+function openGeoHelp(){
+  const denied=S.geoErr===1;
+  $('ghTitle').textContent=denied?'Ubicación bloqueada':'No llega señal de GPS';
+  $('ghSub').textContent=denied
+    ?'El navegador tiene bloqueada la ubicación para esta página. Sin ella la foto no lleva dirección ni coordenadas.'
+    :'El teléfono no está entregando ubicación. Revisa que el GPS esté encendido.';
+  $('geoHelp').classList.add('on');
+}
+function watchPerm(){
+  if(!navigator.permissions||!navigator.permissions.query)return;
+  navigator.permissions.query({name:'geolocation'}).then(st=>{
+    S.perm=st;st.onchange=()=>{if(st.state!=='denied')startGeo()};
+  }).catch(()=>{});
+}
+
+/* Dirección (OpenStreetMap / Nominatim) */
+async function maybeGeocode(){
+  const p=S.pos;if(!p||S.geoBusy||!navigator.onLine)return;
+  if(S.lastGeoPos&&dist(S.lastGeoPos,p)<30)return;
+  if(Date.now()-S.lastGeoAt<5000)return;
+  S.geoBusy=true;S.lastGeoAt=Date.now();
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.lat}&lon=${p.lng}&zoom=18&addressdetails=1&accept-language=es`);
+    if(!r.ok)throw 0;
+    const a=(await r.json()).address||{};
+    const locality=a.city||a.town||a.village||a.municipality||a.city_district||a.suburb||'';
+    const province=a.county||a.state_district||a.region||a.state||'';
+    const road=[a.road||a.pedestrian||a.street||'',a.house_number||''].filter(Boolean).join(' ');
+    const suburb=(a.suburb||a.neighbourhood||a.quarter||'');
+    S.geo={locality,province,road,suburb:suburb!==locality?suburb:'',postcode:a.postcode||'',country:a.country||'',cc:(a.country_code||'').toLowerCase()};
+    S.lastGeoPos={...p};
+  }catch(e){}finally{S.geoBusy=false;renderLive()}
+}
+
+/* ---------- mapa satelital ---------- */
+function loadImg(src){return new Promise(res=>{const i=new Image();i.crossOrigin='anonymous';
+  i.onload=()=>res(i);i.onerror=()=>res(null);setTimeout(()=>res(null),9000);i.src=src})}
+function placeholderMap(){
+  const c=document.createElement('canvas');c.width=c.height=320;const g=c.getContext('2d');
+  g.fillStyle='#3a3f45';g.fillRect(0,0,320,320);g.strokeStyle='rgba(255,255,255,.08)';g.lineWidth=2;
+  for(let i=0;i<=320;i+=40){g.beginPath();g.moveTo(i,0);g.lineTo(i,320);g.moveTo(0,i);g.lineTo(320,i);g.stroke()}
+  c._ok=false;return c;
+}
+async function buildMap(lat,lng){
+  const z=17,n=2**z,x=(lng+180)/360*n*256,lr=lat*Math.PI/180;
+  const y=(1-Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n*256;
+  const tx=Math.floor(x/256),ty=Math.floor(y/256);
+  const big=document.createElement('canvas');big.width=big.height=768;const g=big.getContext('2d');
+  g.fillStyle='#3a3f45';g.fillRect(0,0,768,768);let ok=0;const jobs=[];
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)
+    jobs.push(loadImg(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty+dy}/${tx+dx}`)
+      .then(img=>{if(img){g.drawImage(img,(dx+1)*256,(dy+1)*256);ok++}}));
+  await Promise.all(jobs);
+  if(!ok)return placeholderMap();
+  const out=document.createElement('canvas');out.width=out.height=320;const o=out.getContext('2d');
+  o.drawImage(big,x-(tx-1)*256-160,y-(ty-1)*256-160,320,320,0,0,320,320);
+  try{out.getContext('2d').getImageData(0,0,1,1)}catch(e){return placeholderMap()}
+  out._ok=true;return out;
+}
+async function maybeMap(){
+  const p=S.pos;if(!p||S.mapBusy||!S.cfg.map)return;
+  if(S.mapPos&&S.mapCanvas&&S.mapCanvas._ok&&dist(S.mapPos,p)<25)return;
+  if(S.mapPos&&S.mapCanvas&&!S.mapCanvas._ok&&Date.now()-S.mapPos.t<15000)return;
+  S.mapBusy=true;
+  try{S.mapCanvas=await buildMap(p.lat,p.lng);S.mapPos={...p,t:Date.now()}}catch(e){}
+  S.mapBusy=false;renderMini();
+}
+function drawPin(c,x,y,s){
+  c.save();c.translate(x,y);c.scale(s,s);
+  c.beginPath();c.moveTo(0,0);c.bezierCurveTo(-4,-10,-14,-16,-14,-28);c.arc(0,-28,14,Math.PI,0);c.bezierCurveTo(14,-16,4,-10,0,0);c.closePath();
+  c.shadowColor='rgba(0,0,0,.55)';c.shadowBlur=6;c.shadowOffsetY=2;c.fillStyle='#E1001A';c.fill();
+  c.shadowColor='transparent';c.beginPath();c.arc(0,-28,5.5,0,Math.PI*2);c.fillStyle='#fff';c.fill();c.restore();
+}
+function renderMini(){
+  const c=$('miniMap'),g=c.getContext('2d');
+  g.drawImage(S.mapCanvas||placeholderMap(),0,0,c.width,c.height);
+  if(S.pos)drawPin(g,c.width/2,c.height/2+2,1.25);
+}
+
+/* ---------- datos del sello ---------- */
+function stampData(d){
+  const p=S.pos,G=S.geo;
+  let title='Ubicación GPS',addr='',coord='Sin señal GPS',flag=false;
+  if(p){
+    const pc=plusCode(p.lat,p.lng);
+    coord=`Lat ${p.lat.toFixed(6)}° Long ${p.lng.toFixed(6)}°`+(S.cfg.acc?`  ±${Math.round(p.acc)} m`:'');
+    if(G){
+      const t=[G.locality,G.province,G.country].filter(Boolean);if(t.length)title=t.join(', ');
+      addr=[pc.slice(4),G.road,G.suburb,G.locality,[G.province,G.postcode].filter(Boolean).join(' '),G.country].filter(Boolean).join(', ');
+      flag=G.cc==='pe';
+    }else addr=`Plus Code ${pc}`;
+  }
+  const extra=[S.cfg.name&&`Colaborador: ${S.cfg.name}`,S.cfg.note].filter(Boolean).join(' · ');
+  return {title,flag,body:[addr,coord,fmtDate(d),extra].filter(Boolean),extra};
+}
+function renderLive(){
+  const d=stampData(new Date());
+  $('lTitle').textContent=d.title;$('lFlag').style.display=d.flag?'inline-block':'none';
+  const b=d.body.slice();const ex=d.extra?b.pop():'';
+  $('lAddr').textContent=b[0]&&b.length>2?b[0]:'';
+  $('lCoord').textContent=b.length>2?b[1]:b[0]||'';
+  $('lDate').textContent=b[b.length-1]||'';
+  $('lExtra').textContent=ex;
+  document.querySelector('.mini').style.display=S.cfg.map?'':'none';
+}
+
+/* ---------- dibujo del sello en la foto ---------- */
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function wrap(c,text,maxW){
+  const words=String(text).split(' '),lines=[];let cur='';
+  for(const w of words){const t=cur?cur+' '+w:w;if(c.measureText(t).width<=maxW||!cur)cur=t;else{lines.push(cur);cur=w}}
+  if(cur)lines.push(cur);return lines;
+}
+function drawFlag(c,x,y,w,h){c.fillStyle='#D91023';c.fillRect(x,y,w,h);c.fillStyle='#fff';c.fillRect(x+w/3,y,w/3,h)}
+function drawStamp(c,W,H,data){
+  const u=Math.min(W,H)/1200,m=34*u,gap=14*u,pad=22*u,ms=Math.round(270*u),r=10*u;
+  const withMap=S.cfg.map;
+  const infoX=m+(withMap?ms+gap:0),infoW=W-infoX-m,tw=infoW-pad*2;
+  const FF='Roboto, "Segoe UI", Arial, sans-serif';
+  const FT=`500 ${40*u}px ${FF}`,FB=`400 ${27*u}px ${FF}`,tlh=50*u,blh=36*u;
+  c.font=FT;const tl=wrap(c,data.title,tw-(data.flag?62*u:0));
+  c.font=FB;let bl=[];data.body.forEach(s=>{bl=bl.concat(wrap(c,s,tw).map(t=>({t,x:s===data.extra})))});
+  const ih=pad*2+tl.length*tlh+6*u+bl.length*blh,bh=Math.max(ih,withMap?ms:0),by=H-m-bh;
+  c.save();c.textBaseline='alphabetic';
+  // caja de información
+  c.fillStyle='rgba(20,20,22,.62)';rr(c,infoX,by,infoW,bh,r);c.fill();
+  let cy=by+pad+(bh-ih)/2;c.fillStyle='#fff';
+  c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=3*u;
+  c.font=FT;tl.forEach((l,i)=>{cy+=tlh;c.fillText(l,infoX+pad,cy-12*u);
+    if(i===tl.length-1&&data.flag){c.shadowColor='transparent';drawFlag(c,infoX+pad+c.measureText(l).width+16*u,cy-44*u,48*u,32*u);c.shadowColor='rgba(0,0,0,.35)'}});
+  cy+=6*u;c.font=FB;
+  bl.forEach(o=>{cy+=blh;c.fillStyle=o.x?'#fecaca':'#fff';c.fillText(o.t,infoX+pad,cy-9*u)});
+  c.shadowColor='transparent';
+  // mini mapa
+  if(withMap){
+    const mx=m,my=H-m-ms;
+    c.save();rr(c,mx,my,ms,ms,r);c.clip();
+    c.drawImage(S.mapCanvas||placeholderMap(),mx,my,ms,ms);
+    c.restore();
+    c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=2*u;rr(c,mx,my,ms,ms,r);c.stroke();
+    if(S.pos)drawPin(c,mx+ms/2,my+ms/2+2*u,1.6*u);
+    if(S.mapCanvas&&S.mapCanvas._ok){c.font=`500 ${17*u}px ${FF}`;c.fillStyle='rgba(255,255,255,.9)';c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=3*u;
+      c.fillText('© Esri',mx+9*u,my+ms-10*u);c.shadowColor='transparent'}
+  }
+  // etiqueta superior
+  const tag='Cámara GPS · Provefabrica';c.font=`500 ${24*u}px ${FF}`;
+  const th=42*u,twid=c.measureText(tag).width+56*u,tx=W-m-twid,ty=by-12*u-th;
+  c.fillStyle='rgba(20,20,22,.62)';rr(c,tx,ty,twid,th,th/2);c.fill();
+  c.fillStyle='#E1001A';c.beginPath();c.arc(tx+22*u,ty+th/2,8*u,0,Math.PI*2);c.fill();
+  c.fillStyle='#fff';c.beginPath();c.arc(tx+22*u,ty+th/2,3*u,0,Math.PI*2);c.fill();
+  c.fillText(tag,tx+38*u,ty+th/2+8.5*u);
+  c.restore();
+}
+
+/* ---------- cámara ---------- */
+function notice(title,text,retry){$('nTitle').textContent=title;$('nText').textContent=text;$('nRetry').style.display=retry?'':'none';$('notice').classList.add('on')}
+function stopCam(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null}}
+async function startCam(){
+  stopCam();
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    notice('Cámara no disponible aquí','Abre esta página desde un enlace https (no desde el archivo descargado). Mientras tanto puedes usar “Cámara nativa”.',false);return;
+  }
+  try{
+    S.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:S.facing},width:{ideal:3840},height:{ideal:2160}}});
+    const v=$('video');v.srcObject=S.stream;v.classList.toggle('mirror',S.facing==='user');
+    await v.play().catch(()=>{});
+    $('notice').classList.remove('on');
+  }catch(e){
+    notice('No se pudo abrir la cámara',e&&e.name==='NotAllowedError'?'El permiso de cámara fue bloqueado. Actívalo en los ajustes del navegador para este sitio y reintenta, o usa “Cámara nativa”.':'Otra app puede estar usando la cámara. Ciérrala y reintenta, o usa “Cámara nativa”.',true);
+  }
+}
+function flash(){const f=$('flash');f.classList.add('on');requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('on')))}
+function needGps(){return S.pos||confirm('Aún no hay señal GPS. ¿Tomar la foto sin ubicación?')}
+
+async function finish(canvas){
+  const d=new Date();
+  if(S.cfg.map&&S.pos&&(!S.mapCanvas||!S.mapCanvas._ok)&&navigator.onLine){await maybeMap()}
+  drawStamp(canvas.getContext('2d'),canvas.width,canvas.height,stampData(d));
+  S.fname=stampName(d);
+  canvas.toBlob(b=>{
+    if(!b){toast('No se pudo generar la imagen');return}
+    S.blob=b;if(S.url)URL.revokeObjectURL(S.url);S.url=URL.createObjectURL(b);
+    $('resImg').src=S.url;
+    $('resMeta').textContent=`${S.fname} · ${canvas.width}×${canvas.height} · ${(b.size/1048576).toFixed(1)} MB`;
+    $('result').classList.add('on');
+  },'image/jpeg',0.92);
+}
+function shoot(){
+  const v=$('video');if(!S.stream||!v.videoWidth){toast('La cámara aún no está lista');return}
+  if(!needGps())return;
+  flash();
+  const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);finish(c);
+}
+async function fromFile(f){
+  let src=null;
+  try{src=await createImageBitmap(f,{imageOrientation:'from-image'})}catch(e){
+    src=await new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=URL.createObjectURL(f)})}
+  if(!src){toast('No se pudo leer la foto');return}
+  const w=src.width,h=src.height,k=Math.min(1,4096/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+  c.getContext('2d').drawImage(src,0,0,c.width,c.height);finish(c);
+}
+
+/* ---------- eventos ---------- */
+$('btnShot').onclick=shoot;
+$('btnFlip').onclick=()=>{S.facing=S.facing==='environment'?'user':'environment';startCam()};
+$('nRetry').onclick=startCam;
+$('btnSys').onclick=()=>{if(needGps())$('fileIn').click()};
+$('fileIn').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)fromFile(f)};
+$('btnAgain').onclick=()=>{$('result').classList.remove('on')};
+$('btnSave').onclick=()=>{if(!S.url)return;const a=document.createElement('a');a.href=S.url;a.download=S.fname;document.body.appendChild(a);a.click();a.remove();toast('Foto guardada en Descargas')};
+$('btnShare').onclick=async()=>{
+  if(!S.blob)return;const file=new File([S.blob],S.fname,{type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:S.fname})}catch(e){}}
+  else{$('btnSave').click();toast('Tu navegador no permite compartir: la foto se guardó en Descargas')}
+};
+$('btnCfg').onclick=()=>{$('cName').value=S.cfg.name;$('cNote').value=S.cfg.note;$('cMap').checked=S.cfg.map;$('cAcc').checked=S.cfg.acc;$('cfg').classList.add('on')};
+$('cCancel').onclick=()=>$('cfg').classList.remove('on');
+$('cfg').onclick=e=>{if(e.target.id==='cfg')$('cfg').classList.remove('on')};
+$('cSave').onclick=()=>{S.cfg.name=$('cName').value.trim();S.cfg.note=$('cNote').value.trim();S.cfg.map=$('cMap').checked;S.cfg.acc=$('cAcc').checked;
+  saveCfg();$('cfg').classList.remove('on');renderLive();maybeMap();toast('Ajustes guardados')};
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){stopCam();return}
+  startCam();if(!S.pos)startGeo(); // al volver de Ajustes, reintenta la ubicación
+});
+window.addEventListener('online',()=>{S.lastGeoPos=null;maybeGeocode();maybeMap()});
+$('gpsChip').onclick=()=>{if(S.pos){toast(`Precisión actual ±${Math.round(S.pos.acc)} m`);return}openGeoHelp()};
+$('ghClose').onclick=()=>$('geoHelp').classList.remove('on');
+$('ghRetry').onclick=async()=>{$('geoHelp').classList.remove('on');setChip('wait','Buscando GPS…');
+  const ok=await askGeoOnce(15000);startGeo();if(!ok&&S.geoErr)openGeoHelp()};
+
+renderMini();renderLive();setInterval(renderLive,1000);
+watchPerm();
+setChip('wait','Buscando GPS…');
+askGeoOnce(8000).then(()=>{startGeo();startCam()});
+})();
+</script>
+</body>
+</html>
